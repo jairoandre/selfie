@@ -5,6 +5,8 @@ import android.app.Activity
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.hardware.camera2.CameraAccessException
 import android.net.Uri
 import android.os.Bundle
@@ -12,26 +14,47 @@ import android.provider.MediaStore
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.support.v7.app.AppCompatActivity
+import android.view.View
 import android.widget.Toast
 import com.facebook.drawee.backends.pipeline.Fresco
 import com.facebook.imagepipeline.common.ResizeOptions
 import com.facebook.imagepipeline.request.ImageRequestBuilder
+import com.japo.selfiepoc.client.RetrofitClient
+import com.japo.selfiepoc.client.ServiceClient
+import com.japo.selfiepoc.client.body.ProgressSelfieBody
+import com.japo.selfiepoc.client.response.IdentityVerificationResponse
+import com.japo.selfiepoc.client.response.PostSelfieResponse
 import kotlinx.android.synthetic.main.activity_main.*
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import java.io.ByteArrayOutputStream
 import java.io.File
 
 
 class MainActivity : AppCompatActivity() {
 
-    private val TAKE_PHOTO_REQUEST = 101
-    private val MY_PERMISSIONS_REQUEST_CAMERA = 1242
-    private val MY_PERMISSIONS_REQUEST_WRITE = 1342
+    companion object {
+        const val TAKE_PHOTO_REQUEST = 101
+        const val MY_PERMISSIONS_REQUEST_CAMERA = 1242
+        const val MY_PERMISSIONS_REQUEST_WRITE = 1342
+        const val MY_PERMISSIONS_REQUEST_INTERNET = 1442
+    }
 
     private var mCurrentPhotoPath: String = ""
+    private var file: File? = null
+    private lateinit var service: ServiceClient
+
+    private var verificationId : String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         draweeView?.setOnClickListener { validatePermissions() }
+        sendImageButton?.setOnClickListener { checkNetwork() }
+        createProcessButton?.setOnClickListener { createProcess() }
+        val retrofit = RetrofitClient().instance
+        service = retrofit.create(ServiceClient::class.java)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -51,6 +74,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun createProcess() {
+        progressBar2.visibility = View.VISIBLE
+        val consumerId = consumerIdEditText.text.toString()
+        service.createProcess(consumerId).enqueue(object: Callback<IdentityVerificationResponse> {
+            override fun onResponse(call: Call<IdentityVerificationResponse>?, response: Response<IdentityVerificationResponse>?) {
+                verificationId = response?.body()?.verificationId
+                textView.text = "ID: $verificationId, next step: ${response?.body()?.nextStep}"
+                progressBar2.visibility = View.GONE
+            }
+
+            override fun onFailure(call: Call<IdentityVerificationResponse>?, t: Throwable?) {
+                progressBar2.visibility = View.GONE
+            }
+        })
+    }
+
 
     private fun validatePermissions() {
         checkPermission(Manifest.permission.CAMERA, MY_PERMISSIONS_REQUEST_CAMERA, this::checkWrite)
@@ -59,6 +98,10 @@ class MainActivity : AppCompatActivity() {
     private fun checkWrite() {
         checkPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, MY_PERMISSIONS_REQUEST_WRITE, this::launchCamera)
 
+    }
+
+    private fun checkNetwork() {
+        checkPermission(Manifest.permission.INTERNET, MY_PERMISSIONS_REQUEST_INTERNET, this::sendCurrentImage)
     }
 
     private fun launchCamera() {
@@ -72,11 +115,11 @@ class MainActivity : AppCompatActivity() {
             if (intent.resolveActivity(packageManager) != null) {
                 mCurrentPhotoPath = fileUri.toString()
                 intent.putExtra(MediaStore.EXTRA_OUTPUT, fileUri)
+                intent.putExtra("android.intent.extras.CAMERA_FACING", 1)
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                         or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 startActivityForResult(intent, TAKE_PHOTO_REQUEST)
             }
-
         } catch (e: CameraAccessException) {
             e.printStackTrace()
         }
@@ -89,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         cursor.moveToFirst()
         val photoPath = cursor.getString(0)
         cursor.close()
-        val file = File(photoPath)
+        file = File(photoPath)
         val uri = Uri.fromFile(file)
 
         val height = resources.getDimensionPixelSize(R.dimen.photo_height)
@@ -103,5 +146,46 @@ class MainActivity : AppCompatActivity() {
                 .setImageRequest(request)
                 .build()
         draweeView?.controller = controller
+    }
+
+    // SEND IMAGE
+    private fun sendCurrentImage() {
+        progressBar.visibility = View.VISIBLE
+        progressBar.progress = 0
+        if (file != null) {
+            try {
+                val bitmap = BitmapFactory.decodeFile(file?.path)
+                val byteArray = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, byteArray)
+                val body = ProgressSelfieBody(byteArray.toByteArray())
+                body.setUpListener(object : ProgressSelfieBody.UploadCallbacks {
+                    override fun onProgressUpdate(percentage: Int) {
+                        progressBar.progress = percentage
+                    }
+
+                    override fun onFinish() {
+                        this@MainActivity.runOnUiThread {
+                            progressBar.visibility = View.GONE
+                        }
+                    }
+                })
+
+                if (verificationId != null) {
+                    service.postSelfie(verificationId!!, body).enqueue(object : Callback<PostSelfieResponse> {
+                        override fun onResponse(call: Call<PostSelfieResponse>?, response: Response<PostSelfieResponse>?) {
+                            println(response?.body()?.imgUrl)
+                        }
+
+                        override fun onFailure(call: Call<PostSelfieResponse>?, t: Throwable?) {
+                            println("Failed!")
+                        }
+                    })
+
+                }
+            } catch (e: Exception) {
+                println(e.printStackTrace())
+            }
+        }
+
     }
 }
