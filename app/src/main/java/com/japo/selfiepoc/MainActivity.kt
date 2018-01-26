@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
     private var file: File? = null
     private lateinit var service: ServiceClient
 
-    private var verificationId : String? = null
+    private var verificationId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,11 +77,28 @@ class MainActivity : AppCompatActivity() {
     private fun createProcess() {
         progressBar2.visibility = View.VISIBLE
         val consumerId = consumerIdEditText.text.toString()
-        service.createProcess(consumerId).enqueue(object: Callback<IdentityVerificationResponse> {
+        textView.text = "Creating process..."
+        service.createProcess(consumerId).enqueue(object : Callback<IdentityVerificationResponse> {
             override fun onResponse(call: Call<IdentityVerificationResponse>?, response: Response<IdentityVerificationResponse>?) {
-                verificationId = response?.body()?.verificationId
-                textView.text = "ID: $verificationId, next step: ${response?.body()?.nextStep}"
-                progressBar2.visibility = View.GONE
+                if (response?.code() == 409) {
+                    textView.text = "Creation failed, getting..."
+                    service.getProcess(consumerId).enqueue(object : Callback<IdentityVerificationResponse> {
+                        override fun onResponse(call: Call<IdentityVerificationResponse>?, response: Response<IdentityVerificationResponse>?) {
+                            verificationId = response?.body()?.verificationId
+                            textView.text = "ID: $verificationId, next step: ${response?.body()?.nextStep}"
+                            progressBar2.visibility = View.GONE
+                        }
+
+                        override fun onFailure(call: Call<IdentityVerificationResponse>?, t: Throwable?) {
+                            progressBar2.visibility = View.GONE
+                        }
+                    })
+
+                } else {
+                    verificationId = response?.body()?.verificationId
+                    textView.text = "ID: $verificationId, next step: ${response?.body()?.nextStep}"
+                    progressBar2.visibility = View.GONE
+                }
             }
 
             override fun onFailure(call: Call<IdentityVerificationResponse>?, t: Throwable?) {
@@ -148,15 +165,32 @@ class MainActivity : AppCompatActivity() {
         draweeView?.controller = controller
     }
 
+    private fun getResizedBitmap(image: Bitmap, maxSize: Int): Bitmap {
+        var width = image.width
+        var height = image.height
+
+        val bitmapRatio = width.toFloat() / height.toFloat()
+        if (bitmapRatio > 1) {
+            width = maxSize
+            height = (width / bitmapRatio).toInt()
+        } else if (bitmapRatio > 0) {
+            height = maxSize
+            width = (height * bitmapRatio).toInt()
+        }
+
+        return Bitmap.createScaledBitmap(image, width, height, true)
+    }
+
     // SEND IMAGE
     private fun sendCurrentImage() {
         progressBar.visibility = View.VISIBLE
+        progressBar2.visibility = View.VISIBLE
         progressBar.progress = 0
         if (file != null) {
             try {
-                val bitmap = BitmapFactory.decodeFile(file?.path)
+                val bitmap = getResizedBitmap(BitmapFactory.decodeFile(file?.path), 600)
                 val byteArray = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, byteArray)
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArray)
                 val body = ProgressSelfieBody(byteArray.toByteArray())
                 body.setUpListener(object : ProgressSelfieBody.UploadCallbacks {
                     override fun onProgressUpdate(percentage: Int) {
@@ -174,10 +208,11 @@ class MainActivity : AppCompatActivity() {
                     service.postSelfie(verificationId!!, body).enqueue(object : Callback<PostSelfieResponse> {
                         override fun onResponse(call: Call<PostSelfieResponse>?, response: Response<PostSelfieResponse>?) {
                             println(response?.body()?.imgUrl)
+                            progressBar2.visibility = View.GONE
                         }
 
                         override fun onFailure(call: Call<PostSelfieResponse>?, t: Throwable?) {
-                            println("Failed!")
+                            progressBar2.visibility = View.GONE
                         }
                     })
 

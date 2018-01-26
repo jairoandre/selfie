@@ -6,12 +6,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:background="@color/colorBg"
     tools:context="com.japo.selfiepoc.MainActivity">
 
     <com.facebook.drawee.view.SimpleDraweeView
         android:id="@+id/draweeView"
-        android:layout_width="317dp"
-        android:layout_height="229dp"
+        android:layout_width="318dp"
+        android:layout_height="377dp"
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:layout_marginTop="8dp"
@@ -28,27 +29,25 @@
         android:id="@+id/consumerIdEditText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:ems="10"
         android:hint="Consumer Id"
         android:inputType="textPersonName"
         android:text=""
-        app:layout_constraintBottom_toTopOf="@+id/createProcessButton"
+        android:textColor="@color/colorAccent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/progressBar2" />
 
     <Button
         android:id="@+id/createProcessButton"
         android:layout_width="150dp"
         android:layout_height="50dp"
         android:layout_marginBottom="8dp"
-        android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:text="CREATE PROCESS"
-        app:layout_constraintBottom_toTopOf="@+id/sendImageButton"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
     <Button
@@ -59,11 +58,9 @@
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="8dp"
         android:layout_marginEnd="8dp"
-        android:layout_marginStart="8dp"
         android:text="SEND"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <ProgressBar
         android:id="@+id/progressBar"

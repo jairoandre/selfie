@@ -25,7 +25,7 @@ class RetrofitClient {
                     chain.proceed(requestBuilder)
                 }.build()
         instance = Retrofit.Builder()
-                .baseUrl("http://jairo:9002/verfications/")
+                .baseUrl("http://jairo:9002")
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(okHttpClient)
                 .build()
