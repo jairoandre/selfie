@@ -19,12 +19,9 @@ import android.widget.Toast
 import com.facebook.drawee.backends.pipeline.Fresco
 import com.facebook.imagepipeline.common.ResizeOptions
 import com.facebook.imagepipeline.request.ImageRequestBuilder
-import com.japo.selfiepoc.client.RetrofitClient
-import com.japo.selfiepoc.client.ServiceClient
 import com.japo.selfiepoc.client.body.ProgressSelfieBody
 import com.japo.selfiepoc.client.response.IdentityVerificationResponse
-import com.japo.selfiepoc.client.response.PostSelfieResponse
-import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.android.synthetic.main.activity_selfie.*
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -32,7 +29,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 
 
-class MainActivity : AppCompatActivity() {
+class SelfieActivity : AppCompatActivity() {
 
     companion object {
         const val TAKE_PHOTO_REQUEST = 101
@@ -43,18 +40,14 @@ class MainActivity : AppCompatActivity() {
 
     private var mCurrentPhotoPath: String = ""
     private var file: File? = null
-    private lateinit var service: ServiceClient
-
-    private var verificationId: String? = null
+    private val app = MyApplication.instance
+    private val service = app.service
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_selfie)
         draweeView?.setOnClickListener { validatePermissions() }
         sendImageButton?.setOnClickListener { checkNetwork() }
-        createProcessButton?.setOnClickListener { createProcess() }
-        val retrofit = RetrofitClient().instance
-        service = retrofit.create(ServiceClient::class.java)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -74,40 +67,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createProcess() {
-        progressBar2.visibility = View.VISIBLE
-        val consumerId = consumerIdEditText.text.toString()
-        textView.text = "Creating process..."
-        service.createProcess(consumerId).enqueue(object : Callback<IdentityVerificationResponse> {
-            override fun onResponse(call: Call<IdentityVerificationResponse>?, response: Response<IdentityVerificationResponse>?) {
-                if (response?.code() == 409) {
-                    textView.text = "Creation failed, getting..."
-                    service.getProcess(consumerId).enqueue(object : Callback<IdentityVerificationResponse> {
-                        override fun onResponse(call: Call<IdentityVerificationResponse>?, response: Response<IdentityVerificationResponse>?) {
-                            verificationId = response?.body()?.verificationId
-                            textView.text = "ID: $verificationId, next step: ${response?.body()?.nextStep}"
-                            progressBar2.visibility = View.GONE
-                        }
-
-                        override fun onFailure(call: Call<IdentityVerificationResponse>?, t: Throwable?) {
-                            progressBar2.visibility = View.GONE
-                        }
-                    })
-
-                } else {
-                    verificationId = response?.body()?.verificationId
-                    textView.text = "ID: $verificationId, next step: ${response?.body()?.nextStep}"
-                    progressBar2.visibility = View.GONE
-                }
-            }
-
-            override fun onFailure(call: Call<IdentityVerificationResponse>?, t: Throwable?) {
-                progressBar2.visibility = View.GONE
-            }
-        })
-    }
-
-
     private fun validatePermissions() {
         checkPermission(Manifest.permission.CAMERA, MY_PERMISSIONS_REQUEST_CAMERA, this::checkWrite)
     }
@@ -126,15 +85,15 @@ class MainActivity : AppCompatActivity() {
             val values = ContentValues(1)
             values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpg")
             val fileUri = contentResolver
-                    .insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                            values)
+                .insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    values)
             val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
             if (intent.resolveActivity(packageManager) != null) {
                 mCurrentPhotoPath = fileUri.toString()
                 intent.putExtra(MediaStore.EXTRA_OUTPUT, fileUri)
                 intent.putExtra("android.intent.extras.CAMERA_FACING", 1)
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                    or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 startActivityForResult(intent, TAKE_PHOTO_REQUEST)
             }
         } catch (e: CameraAccessException) {
@@ -144,8 +103,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun processCapturedPhoto() {
         val cursor = contentResolver.query(Uri.parse(mCurrentPhotoPath),
-                Array(1) { android.provider.MediaStore.Images.ImageColumns.DATA },
-                null, null, null)
+            Array(1) { android.provider.MediaStore.Images.ImageColumns.DATA },
+            null, null, null)
         cursor.moveToFirst()
         val photoPath = cursor.getString(0)
         cursor.close()
@@ -156,12 +115,12 @@ class MainActivity : AppCompatActivity() {
         val width = resources.getDimensionPixelSize(R.dimen.photo_width)
 
         val request = ImageRequestBuilder.newBuilderWithSource(uri)
-                .setResizeOptions(ResizeOptions(width, height))
-                .build()
+            .setResizeOptions(ResizeOptions(width, height))
+            .build()
         val controller = Fresco.newDraweeControllerBuilder()
-                .setOldController(draweeView?.controller)
-                .setImageRequest(request)
-                .build()
+            .setOldController(draweeView?.controller)
+            .setImageRequest(request)
+            .build()
         draweeView?.controller = controller
     }
 
@@ -184,7 +143,7 @@ class MainActivity : AppCompatActivity() {
     // SEND IMAGE
     private fun sendCurrentImage() {
         progressBar.visibility = View.VISIBLE
-        progressBar2.visibility = View.VISIBLE
+        uploadProgress.visibility = View.VISIBLE
         progressBar.progress = 0
         if (file != null) {
             try {
@@ -198,21 +157,21 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     override fun onFinish() {
-                        this@MainActivity.runOnUiThread {
+                        this@SelfieActivity.runOnUiThread {
                             progressBar.visibility = View.GONE
                         }
                     }
                 })
 
-                if (verificationId != null) {
-                    service.postSelfie(verificationId!!, body).enqueue(object : Callback<PostSelfieResponse> {
-                        override fun onResponse(call: Call<PostSelfieResponse>?, response: Response<PostSelfieResponse>?) {
-                            println(response?.body()?.imgUrl)
-                            progressBar2.visibility = View.GONE
+                if (app.verificationId != null) {
+                    service.postSelfie(app.verificationId!!, body).enqueue(object : Callback<IdentityVerificationResponse> {
+                        override fun onResponse(call: Call<IdentityVerificationResponse>?, response: Response<IdentityVerificationResponse>?) {
+                            println(response?.body()?.nextStep)
+                            uploadProgress.visibility = View.GONE
                         }
 
-                        override fun onFailure(call: Call<PostSelfieResponse>?, t: Throwable?) {
-                            progressBar2.visibility = View.GONE
+                        override fun onFailure(call: Call<IdentityVerificationResponse>?, t: Throwable?) {
+                            uploadProgress.visibility = View.GONE
                         }
                     })
 

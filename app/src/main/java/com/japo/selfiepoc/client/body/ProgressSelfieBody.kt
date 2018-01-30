@@ -13,8 +13,8 @@ class ProgressSelfieBody(val mFile: ByteArray) : RequestBody() {
 
     interface UploadCallbacks {
         fun onProgressUpdate(percentage: Int)
-        fun onError(){}
-        fun onFinish(){}
+        fun onError() {}
+        fun onFinish() {}
     }
 
     fun setUpListener(listener: UploadCallbacks) {
@@ -34,14 +34,14 @@ class ProgressSelfieBody(val mFile: ByteArray) : RequestBody() {
 
         try {
             val handler = Handler(Looper.getMainLooper())
-            while ({ read = inputStream.read(buffer); read }() != -1){
+            while ({ read = inputStream.read(buffer); read }() != -1) {
                 sink.write(buffer, 0, read)
                 uploaded += read
                 handler.post(ProgressUpdater(uploaded, fileLength))
             }
-        }catch (e: Exception){
+        } catch (e: Exception) {
             mListener?.onError()
-        }finally {
+        } finally {
             mListener?.onFinish()
         }
     }

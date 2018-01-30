@@ -7,27 +7,26 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-class RetrofitClient {
+class RetrofitClient(private val baseUrl: String) {
 
-    val instance: Retrofit
 
-    init {
+    fun client(): Retrofit {
         val credentials = Credentials.basic("microservice", "access_key")
         val okHttpClient = OkHttpClient.Builder()
-                .readTimeout(180, TimeUnit.SECONDS)
-                .connectTimeout(180, TimeUnit.SECONDS)
-                .addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))
-                .addInterceptor { chain ->
-                    val original = chain.request()
-                    val requestBuilder = original.newBuilder()
-                            .header("Authorization", credentials)
-                            .build()
-                    chain.proceed(requestBuilder)
-                }.build()
-        instance = Retrofit.Builder()
-                .baseUrl("http://jairo:9002")
-                .addConverterFactory(GsonConverterFactory.create())
-                .client(okHttpClient)
-                .build()
+            .readTimeout(180, TimeUnit.SECONDS)
+            .connectTimeout(180, TimeUnit.SECONDS)
+            .addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))
+            .addInterceptor { chain ->
+                val original = chain.request()
+                val requestBuilder = original.newBuilder()
+                    .header("Authorization", credentials)
+                    .build()
+                chain.proceed(requestBuilder)
+            }.build()
+        return Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(okHttpClient)
+            .build()
     }
 }
